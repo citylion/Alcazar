@@ -1,5 +1,8 @@
 package moe.oko.alcazar.database;
 
+import org.bukkit.Bukkit;
+import org.bukkit.event.server.BroadcastMessageEvent;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +24,22 @@ public class ASQL {
         }
     }
 
+    public static void dbReconnection() {
+        try {
+            connection = DriverManager.getConnection(instance.getConfig().getString("sql"));
+            System.out.println("[DATABASE] SUCCESS | Connection reestablished.");
+            Bukkit.getServer().broadcastMessage("Inventory Plugin Reconnected! Now working.");
+        } catch (SQLException e) {
+            System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.initConnection failed to execute!");
+        }
+    }
+
+    public static void dbFailureProcedure(SQLException exception){
+        System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.countPlayerInventories function failed to execute successfully.");
+        System.err.println(exception);
+        Bukkit.getServer().broadcastMessage("Inventory Plugin Error. Attempting to reconnect to DB.");
+    }
+
     /**
      * Counts the number of inventories created by a player.
      *
@@ -38,49 +57,46 @@ public class ASQL {
             resultSet.close();
             return count;
 
-        } catch (SQLException exception) {
-            System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.countPlayerInventories function failed to execute successfully.");
-            System.err.println(exception);
+        } catch (SQLException e) {
+            dbFailureProcedure(e);
         }
         return 0;
     }
 
     public static Boolean addNewInventory(String UUID, String name, String serializedInv, String serializedArmor) {
-        try {
-            PreparedStatement preparedStatement = connection.prepareStatement("REPLACE INTO inventory_table(uuid, inventory_name, si, sa) VALUES (?, ?, ?, ?)");
-            preparedStatement.setString(1, UUID);
-            preparedStatement.setString(2, name);
-            preparedStatement.setString(3, serializedInv);
-            preparedStatement.setString(4, serializedArmor);
-            preparedStatement.execute();
-            preparedStatement.close();
-            return true;
-        } catch (SQLException exception) {
-            System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.addNewInventory function failed to execute successfully.");
-            System.err.println(exception);
-        }
-        return false;
+            try {
+                PreparedStatement preparedStatement = connection.prepareStatement("REPLACE INTO inventory_table(uuid, inventory_name, si, sa) VALUES (?, ?, ?, ?)");
+                preparedStatement.setString(1, UUID);
+                preparedStatement.setString(2, name);
+                preparedStatement.setString(3, serializedInv);
+                preparedStatement.setString(4, serializedArmor);
+                preparedStatement.execute();
+                preparedStatement.close();
+                return true;
+            } catch (SQLException e) {
+                dbFailureProcedure(e);
+            }
+            return false;
+
     }
 
     public static String[] getInv(String invName){
-        try {
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM inventory_table WHERE inventory_name=?");
-            preparedStatement.setString(1, invName);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
-                String inventory = resultSet.getString("si");
-                String armor = resultSet.getString("sa");
-                preparedStatement.close();
-                resultSet.close();
-                return new String[] { inventory, armor };
+            try {
+                PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM inventory_table WHERE inventory_name=?");
+                preparedStatement.setString(1, invName);
+                ResultSet resultSet = preparedStatement.executeQuery();
+                if (resultSet.next()) {
+                    String inventory = resultSet.getString("si");
+                    String armor = resultSet.getString("sa");
+                    preparedStatement.close();
+                    resultSet.close();
+                    return new String[]{inventory, armor};
+                }
+            } catch (SQLException e) {
+                dbFailureProcedure(e);
             }
-        } catch (SQLException e) {
-            System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.getInv function failed to execute successfully.");
-            System.err.println(e);
+            return null;
         }
-
-        return null;
-    }
 
     /**
      * Removes an inventory from the database.
@@ -94,9 +110,8 @@ public class ASQL {
             preparedStatement.execute();
             preparedStatement.close();
             return true;
-        } catch (SQLException exception) {
-            System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.removeInventory function failed to execute successfully.");
-            System.err.println(exception);
+        } catch (SQLException e) {
+            dbFailureProcedure(e);
         }
         return false;
     }
@@ -107,23 +122,23 @@ public class ASQL {
      * @return a list with all entries from column inventory_name.
      */
     public static List<String> getInvNames(){
-        try {
-            PreparedStatement preparedStatement = connection.prepareStatement("SELECT inventory_name FROM inventory_table");
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
-                List<String> names = new ArrayList<>();
-                names.add(resultSet.getString("inventory_name"));
-                while(resultSet.next()){
+            try {
+                PreparedStatement preparedStatement = connection.prepareStatement("SELECT inventory_name FROM inventory_table");
+                ResultSet resultSet = preparedStatement.executeQuery();
+                if (resultSet.next()) {
+                    List<String> names = new ArrayList<>();
                     names.add(resultSet.getString("inventory_name"));
+                    while(resultSet.next()){
+                        names.add(resultSet.getString("inventory_name"));
+                    }
+                    preparedStatement.close();
+                    resultSet.close();
+                    return names;
                 }
-                preparedStatement.close();
-                resultSet.close();
-                return names;
+            } catch (SQLException e) {
+                dbFailureProcedure(e);
             }
-        } catch (SQLException e) {
-            System.err.println("[DATABASE] ERROR | The moe.oko.alcazar.database.ASQL.getInvNames function failed to execute successfully.");
-            System.err.println(e);
-        }
+
         return null;
     }
 
